@@ -33,8 +33,6 @@ namespace locationserver
         public MainWindow()
         {
             InitializeComponent();
-            myserver._response = "";
-            this.DataContext = myserver;
         }
 
         private void start_Click(object sender, RoutedEventArgs e)
@@ -59,7 +57,18 @@ namespace locationserver
 
         private void worker_DoWork(object sender, DoWorkEventArgs e) //start server
         {
+            string lg;
+            myserver.UIMode = true;
             myserver.Main(arguments.ToArray());
+            while (true)
+            {
+                myserver.connection = myserver.listener.AcceptSocket();
+                Server.Handler RequestHandler = new Server.Handler();
+                RequestHandler.doRequest(myserver.connection, out lg);
+                this.Dispatcher.Invoke(() => {consol.Text = "New Connection\r\n";});
+                this.Dispatcher.Invoke(() => {consol.Text += lg + "\r\n";});
+                this.Dispatcher.Invoke(() => {consol.Text += $"[Disconnected]\r\n"; });
+            }
         }
 
         void bgw_Complete(object sender, RunWorkerCompletedEventArgs e)
