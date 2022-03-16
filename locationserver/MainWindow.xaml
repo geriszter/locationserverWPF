@@ -4,12 +4,12 @@
         Title="Location Server" Height="341" Width="512" Background="#2d2d30" ResizeMode="CanMinimize">
     <Grid>
         <Label Content="Server Log:" Height="28" HorizontalAlignment="Left" Margin="8,6,0,0"  VerticalAlignment="Top" FontSize="14" Foreground="White" />
-        <TextBox Height="231" HorizontalAlignment="Left" Margin="11,38,0,0" Name="chatBox" VerticalAlignment="Top" Width="479" IsReadOnly="True" VerticalScrollBarVisibility="Visible" Background="LightGray" />
+        <TextBox Height="231" Text="{Binding outter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" HorizontalAlignment="Left" Margin="11,38,0,0" x:Name="consol" VerticalAlignment="Top" Width="479" IsReadOnly="True" VerticalScrollBarVisibility="Visible" Background="LightGray" />
         <Button Content="Start" Height="23" HorizontalAlignment="Left" Margin="8,274,0,0" Name="start" VerticalAlignment="Top" Width="80" Click="start_Click"/>
         <Button Content="Stop" Height="23" HorizontalAlignment="Left" Margin="93,274,0,0" Name="stop" VerticalAlignment="Top" Width="80" Click="stop_Click"/>
-        <Button Content="Exit" Height="23" HorizontalAlignment="Left" Margin="400,274,0,0" Name="sendMessageButton" VerticalAlignment="Top" Width="90"/>
-        <CheckBox Content="Save Log" HorizontalAlignment="Left" Margin="185,278,0,0" VerticalAlignment="Top" Background="White" Foreground="White"/>
-        <CheckBox Content="Save Database" HorizontalAlignment="Left" Margin="258,278,0,0" VerticalAlignment="Top" Background="White" Foreground="White"/>
+        <Button Content="Exit" Height="23" HorizontalAlignment="Left" Margin="400,274,0,0" Name="sendMessageButton" VerticalAlignment="Top" Width="90" Click="sendMessageButton_Click"/>
+        <CheckBox x:Name="saveLog" Content="Save Log" HorizontalAlignment="Left" Margin="185,278,0,0" VerticalAlignment="Top" Background="White" Foreground="White"/>
+        <CheckBox x:Name="SaveDb" Content="Save Database" HorizontalAlignment="Left" Margin="258,278,0,0" VerticalAlignment="Top" Background="White" Foreground="White"/>
     </Grid>
 
 </Window>

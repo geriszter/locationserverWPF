@@ -9,6 +9,8 @@ namespace locationserver
 {
     class Server
     {
+        public bool UIMode = false;
+
         public void Main(string[] args)
         {
             string LogFilePath = null;
@@ -35,9 +37,8 @@ namespace locationserver
             }
             runServer(LogFilePath, dbFilePath, debug);
         }
-        static void runServer(string logPath, string savePath, bool debug)
+        private void runServer(string logPath, string savePath, bool debug)
         {
-
             TcpListener listener;
             Socket connection;
             Handler RequestHandler;
@@ -49,7 +50,7 @@ namespace locationserver
                 listener.Start();
 
                 Console.WriteLine("Server started");
-                if (debug) { Console.WriteLine("Debugging mode is enabled"); };
+                if (debug) { Console.WriteLine("Debugging mode is enabled");};
                 while (true)
                 {
                     connection = listener.AcceptSocket();
@@ -80,7 +81,7 @@ namespace locationserver
 
             }
         }
-        class Handler
+        public class Handler
         {
             private static readonly object locker = new object();
 
