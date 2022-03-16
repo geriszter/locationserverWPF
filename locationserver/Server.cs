@@ -38,7 +38,6 @@ namespace locationserver
                         debug = true;
                         break;
                 }
-
             }
             runServer();
         }
@@ -77,15 +76,6 @@ namespace locationserver
             RequestHandler = new Handler();
             string lg;
             new Thread(() => RequestHandler.doRequest(connection, out lg)).Start();
-
-        }
-
-        public void serverLoopUI()
-        {
-            connection = listener.AcceptSocket();
-            //RequestHandler = new Handler();
-            //new Thread(() => RequestHandler.doRequest(connection, personLocation, logPath, savePath, debug)).Start();
-
         }
 
 
@@ -103,7 +93,6 @@ namespace locationserver
             }
             catch
             {
-
             }
         }
         public class Handler: Server
@@ -118,15 +107,12 @@ namespace locationserver
                 Console.WriteLine("New Connection");
                 try
                 {
-
                     int timeOut = 1000;
                     socketStream.ReadTimeout = timeOut;
                     socketStream.WriteTimeout = timeOut;
                     StreamReader sr = new StreamReader(socketStream);
 
-
                     string line = null;
-
                     while (line == null)
                     {
                         try
@@ -156,10 +142,7 @@ namespace locationserver
                     }
 
                     lg = log;
-
                     if (debug) { Console.WriteLine($"Server sending back:\"{response}\""); };
-
-
                     lock (locker)
                     {
                         StreamWriter sw = new StreamWriter(socketStream);
@@ -181,6 +164,14 @@ namespace locationserver
                     Console.WriteLine("[Disconnected]");
                 }
             }
+            /// <summary>
+            /// Process the input, creates log and respond message.
+            /// </summary>
+            /// <param name="personLocation">The database (Dictionary)</param>
+            /// <param name="ip">ip address of the client</param>
+            /// <param name="line">The input what we want to process</param>
+            /// <param name="response">The response what we sending back</param>
+            /// <param name="log">The log message of the input</param>
             public void RequestFormat(Dictionary<string, string> personLocation, string ip, string line, out string response, out string log)
             {
                 string name = null;
@@ -299,7 +290,7 @@ namespace locationserver
                         }
                     }
                 }
-
+                //whois request GET
                 if (commands.Length == 1)
                 {
                     name = commands[0];
@@ -316,6 +307,7 @@ namespace locationserver
                         log += $" \" GET {name}\" UNKNOWN";
                     }
                 }
+                //whois request SET
                 else if (commands.Length > 1 && ched)
                 {
                     name = commands[0];
@@ -330,7 +322,13 @@ namespace locationserver
                     log += $"\"{name} {location} WHOIS\" OK";
                 }
             }
-
+            /// <summary>
+            /// If the user already in the database updates its location,
+            /// otherwise adds it to the database.
+            /// </summary>
+            /// <param name="name">User's name</param>
+            /// <param name="location">Location of the user</param>
+            /// <param name="personLocation">Database</param>
             static void UpdateAndAdd(string name, string location, Dictionary<string, string> personLocation)
             {
                 location = location.Trim(new Char[] { '\"', '\'', '`', '\\', '.' });
@@ -343,7 +341,13 @@ namespace locationserver
                     personLocation.Add(name, location);
                 }
             }
-
+            /// <summary>
+            /// If the database contains the name of the user, then returns its location,
+            /// Otherwise return null,
+            /// </summary>
+            /// <param name="name">User name in the database</param>
+            /// <param name="personLocation">Location of the user</param>
+            /// <returns></returns>
             static string GetLocation(string name, Dictionary<string, string> personLocation)
             {
 
@@ -357,7 +361,11 @@ namespace locationserver
                     return null;
                 }
             }
-
+            /// <summary>
+            /// Saves the content of the database to the desired filepath
+            /// </summary>
+            /// <param name="database">Name of the database</param>
+            /// <param name="path">Path of the file</param>
             static void SaveDictionary(Dictionary<string, string> database, string path)
             {
                 lock (locker)
@@ -377,7 +385,11 @@ namespace locationserver
                     }
                 }
             }
-
+            /// <summary>
+            /// Writes the log messages to the file
+            /// </summary>
+            /// <param name="logMessage">the message</param>
+            /// <param name="FilePath">the file path</param>
             static void WriteLog(string logMessage, string FilePath)
             {
                 lock (locker)
