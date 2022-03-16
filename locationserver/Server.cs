@@ -9,7 +9,8 @@ namespace locationserver
 {
     class Server
     {
-        public bool UIMode = false;
+        public string _response { get; set; }
+
 
         public void Main(string[] args)
         {
@@ -50,7 +51,8 @@ namespace locationserver
                 listener.Start();
 
                 Console.WriteLine("Server started");
-                if (debug) { Console.WriteLine("Debugging mode is enabled");};
+                _response = "Server started";
+                if (debug) { Console.WriteLine("Debugging mode is enabled"); };
                 while (true)
                 {
                     connection = listener.AcceptSocket();
@@ -62,7 +64,12 @@ namespace locationserver
             {
                 Console.WriteLine("Exeption: " + e.ToString());
             }
+            finally 
+            {
+                Console.WriteLine("Server stopped");
+            }
         }
+
 
         static void LoadDb(string path, Dictionary<string, string> db)
         {
