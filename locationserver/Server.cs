@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
@@ -10,31 +9,22 @@ namespace locationserver
 {
     class Server
     {
-        private TcpClient tcpClient;
-        private TcpListener listener;
-        private Socket connection;
-        private Dictionary<string, string> personLocation = new Dictionary<string, string>();
-
-        private string logPath = null;
-        private string savePath = null;
-        private bool debug = false;
-
-        private readonly BackgroundWorker bgworker1 = new BackgroundWorker();
-        private readonly BackgroundWorker bgworker2 = new BackgroundWorker();
-
         public void Main(string[] args)
         {
+            string LogFilePath = null;
+            string dbFilePath = null;
+            bool debug = false;
             for (int i = 0; i < args.Length; i++)
             {
                 switch (args[i])
                 {
                     case "-l":
-                        logPath = args[i + 1];
+                        LogFilePath = args[i + 1];
                         break;
                     case "-f":
                         if (args.Length >= i + 1)
                         {
-                            savePath = args[i + 1];
+                            dbFilePath = args[i + 1];
                         }
                         break;
                     case "-d":
@@ -43,10 +33,15 @@ namespace locationserver
                 }
 
             }
-            runServer();
+            runServer(LogFilePath, dbFilePath, debug);
         }
-        public void runServer()
+        static void runServer(string logPath, string savePath, bool debug)
         {
+
+            TcpListener listener;
+            Socket connection;
+            Handler RequestHandler;
+            Dictionary<string, string> personLocation = new Dictionary<string, string>();
             if (savePath != null) { LoadDb(savePath, personLocation); }
             try
             {
@@ -55,13 +50,12 @@ namespace locationserver
 
                 Console.WriteLine("Server started");
                 if (debug) { Console.WriteLine("Debugging mode is enabled"); };
-
-                this.bgworker1.RunWorkerAsync();
-                //while (true)
-                //{
-                //    connection = listener.AcceptSocket();
-                //    //new Thread(() => RequestHandler.doRequest(connection, personLocation, logPath, savePath, debug)).Start();
-                //}
+                while (true)
+                {
+                    connection = listener.AcceptSocket();
+                    RequestHandler = new Handler();
+                    new Thread(() => RequestHandler.doRequest(connection, personLocation, logPath, savePath, debug)).Start();
+                }
             }
             catch (Exception e)
             {
@@ -86,313 +80,303 @@ namespace locationserver
 
             }
         }
-        private static readonly object locker = new object();
-
-        public void doRequest()
+        class Handler
         {
-            string ip = ((IPEndPoint)(connection.RemoteEndPoint)).Address.ToString();
-            Console.WriteLine("New Connection");
-            StreamReader sr = new StreamReader(tcpClient.GetStream());
-            try
+            private static readonly object locker = new object();
+
+            public void doRequest(Socket connection, Dictionary<string, string> personLocation, string LogFilePath, string dblocation, bool debug)
             {
 
-
-                string name = null;
-                string location = null;
-                string response = null;
-                bool ched = true;
-                string line = null;
-
-                while (line == null)
+                NetworkStream socketStream;
+                socketStream = new NetworkStream(connection);
+                string ip = ((IPEndPoint)(connection.RemoteEndPoint)).Address.ToString();
+                Console.WriteLine("New Connection");
+                try
                 {
-                    try
+
+                    int timeOut = 1000;
+                    socketStream.ReadTimeout = timeOut;
+                    socketStream.WriteTimeout = timeOut;
+                    StreamReader sr = new StreamReader(socketStream);
+                    string name = null;
+                    string location = null;
+                    string response = null;
+                    bool ched = true;
+
+
+                    string line = null;
+
+                    while (line == null)
                     {
-                        while (sr.Peek() > -1)
+                        try
                         {
-                            line += (char)sr.Read();
+                            while (sr.Peek() > -1)
+                            {
+                                line += (char)sr.Read();
+                            }
+                        }
+                        catch
+                        {
                         }
                     }
-                    catch
+                    //while (line == null)
+                    //{
+                    //    try
+                    //    {
+                    //        int num;
+                    //        while ((num = sr.Read()) > 0)
+                    //        {
+                    //            line += ((char)num);
+                    //        }
+                    //    }
+                    //    catch
+                    //    {
+                    //    }
+                    //}
+
+                    if (debug) { Console.WriteLine($"Server received:\"{line}\" request"); };
+
+
+                    string log = ip + " - - " + DateTime.Now.ToString("'['dd'/'MM'/'yyyy':'HH':'mm':'ss zz00']'");
+                    string[] commands = line.Split(" ");
+                    //GET commands
+                    if (commands[0] == "GET")
                     {
-                    }
-                }
-                //while (line == null)
-                //{
-                //    try
-                //    {
-                //        int num;
-                //        while ((num = sr.Read()) > 0)
-                //        {
-                //            line += ((char)num);
-                //        }
-                //    }
-                //    catch
-                //    {
-                //    }
-                //}
+                        if (commands.Length > 2)
+                        {
+                            //GET HTTP/1.0
+                            if (commands[2].Contains("HTTP/1.0"))
+                            {
+                                ched = false;
+                                name = commands[1].Remove(0, 2);
+                                location = GetLocation(name, personLocation);
 
-                if (debug) { Console.WriteLine($"Server received:\"{line}\" request"); };
+                                if (location != null)
+                                {
+                                    response = $"HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n\r\n{location}\r\n";
+                                    log += $" \" GET /{name} HTTP/1.0\" OK";
+                                }
+                                else
+                                {
+                                    response = "HTTP/1.0 404 Not Found\r\nContent-Type: text/plain\r\n\r\n";
+                                    log += $" \" GET /{name} HTTP/1.0\" UNKNOWN";
 
+                                }
+                            }
+                            //GET HTTP/1.1
+                            else if (commands[2].Contains("HTTP/1.1"))
+                            {
+                                ched = false;
+                                name = commands[1].Remove(0, 7);
+                                location = GetLocation(name, personLocation);
 
-                string log = ip + " - - " + DateTime.Now.ToString("'['dd'/'MM'/'yyyy':'HH':'mm':'ss zz00']'");
-                string[] commands = line.Split(" ");
-                //GET commands
-                if (commands[0] == "GET")
-                {
-                    if (commands.Length > 2)
-                    {
-                        //GET HTTP/1.0
-                        if (commands[2].Contains("HTTP/1.0"))
+                                if (location != null)
+                                {
+                                    response = $"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\n{location}\r\n";
+                                    log += $" \" GET /name={name} HTTP/1.1\" OK";
+                                }
+                                else
+                                {
+                                    response = "HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\n\r\n";
+                                    log += $" \" GET /name={name} HTTP/1.1\" UNKNOWN";
+                                }
+                            }
+                        }
+                        //GET HTTP/0.9
+                        else if (commands.Length == 2)
                         {
                             ched = false;
-                            name = commands[1].Remove(0, 2);
+                            //5th character is the name start
+                            name = line.Remove(0, 5);
+                            name = name.Remove(name.Length - 2);
                             location = GetLocation(name, personLocation);
-
                             if (location != null)
                             {
-                                response = $"HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n\r\n{location}\r\n";
-                                log += $" \" GET /{name} HTTP/1.0\" OK";
+                                response = $"HTTP/0.9 200 OK\r\nContent-Type: text/plain\r\n\r\n{location}\r\n";
+                                log += $" \" GET /{name}\" OK";
                             }
                             else
                             {
-                                response = "HTTP/1.0 404 Not Found\r\nContent-Type: text/plain\r\n\r\n";
-                                log += $" \" GET /{name} HTTP/1.0\" UNKNOWN";
-
-                            }
-                        }
-                        //GET HTTP/1.1
-                        else if (commands[2].Contains("HTTP/1.1"))
-                        {
-                            ched = false;
-                            name = commands[1].Remove(0, 7);
-                            location = GetLocation(name, personLocation);
-
-                            if (location != null)
-                            {
-                                response = $"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\n{location}\r\n";
-                                log += $" \" GET /name={name} HTTP/1.1\" OK";
-                            }
-                            else
-                            {
-                                response = "HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\n\r\n";
-                                log += $" \" GET /name={name} HTTP/1.1\" UNKNOWN";
+                                response = "HTTP/0.9 404 Not Found\r\nContent-Type: text/plain\r\n\r\n";
+                                log += $" \" GET /{name}\" UNKNOWN";
                             }
                         }
                     }
-                    //GET HTTP/0.9
-                    else if (commands.Length == 2)
+                    //PUT HTTP/0.9 
+                    else if (commands[0] == "PUT" && commands[1].IndexOf("/") == 0 && line.Contains("\r\n\r\n"))
                     {
                         ched = false;
-                        //5th character is the name start
-                        name = line.Remove(0, 5);
+                        string[] array = line.Split("\r\n");
+                        name = array[0].Remove(0, 5);
+                        location = array[array.Length - 2];
+                        Console.WriteLine("AddLocation " + location);
+                        UpdateAndAdd(name, location, personLocation);
+
+                        response = $"HTTP/0.9 200 OK\r\nContent-Type: text/plain\r\n\r\n";
+                        log += $" \" PUT /{name}\" OK";
+
+                    }
+                    else if (commands[0] == "POST")
+                    {
+                        Console.WriteLine("POST");
+                        if (commands.Length > 2)
+                        {
+                            //"HTTP/1.0"
+                            if (commands[2].Contains("HTTP/1.0"))
+                            {
+                                ched = false;
+                                name = commands[1].Remove(0, 1);
+                                string[] array = line.Split("\r\n");
+                                location = array[array.Length - 1];
+
+                                UpdateAndAdd(name, location, personLocation);
+                                response = "HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n\r\n";
+                                log += $" \" POST /{name} HTTP/1.0\" OK";
+                            }
+                            //"HTTP/1.1"
+                            else if (commands[2].Contains("HTTP/1.1"))
+                            {
+                                ched = false;
+                                int locationIndex = line.IndexOf("&location=");
+                                int nameIndex = line.IndexOf("name=");
+                                name = line.Remove(locationIndex);
+                                name = name.Remove(0, (5 + nameIndex));
+
+                                location = line.Remove(0, (10 + locationIndex));
+                                UpdateAndAdd(name, location, personLocation);
+                                response = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\n";
+                                log += $" \" POST /name={name}&location={location}  HTTP/1.1\" OK";
+                            }
+                        }
+                    }
+
+                    if (commands.Length == 1)
+                    {
+                        name = commands[0];
                         name = name.Remove(name.Length - 2);
                         location = GetLocation(name, personLocation);
                         if (location != null)
                         {
-                            response = $"HTTP/0.9 200 OK\r\nContent-Type: text/plain\r\n\r\n{location}\r\n";
-                            log += $" \" GET /{name}\" OK";
+                            response = location;
+                            log += $" \" GET {name}\" OK";
                         }
                         else
                         {
-                            response = "HTTP/0.9 404 Not Found\r\nContent-Type: text/plain\r\n\r\n";
-                            log += $" \" GET /{name}\" UNKNOWN";
+                            response = "ERROR: no entries found";
+                            log += $" \" GET {name}\" UNKNOWN";
                         }
                     }
-                }
-                //PUT HTTP/0.9 
-                else if (commands[0] == "PUT" && commands[1].IndexOf("/") == 0 && line.Contains("\r\n\r\n"))
-                {
-                    ched = false;
-                    string[] array = line.Split("\r\n");
-                    name = array[0].Remove(0, 5);
-                    location = array[array.Length - 2];
-                    Console.WriteLine("AddLocation " + location);
-                    UpdateAndAdd(name, location, personLocation);
-
-                    response = $"HTTP/0.9 200 OK\r\nContent-Type: text/plain\r\n\r\n";
-                    log += $" \" PUT /{name}\" OK";
-
-                }
-                else if (commands[0] == "POST")
-                {
-                    Console.WriteLine("POST");
-                    if (commands.Length > 2)
+                    else if (commands.Length > 1 && ched)
                     {
-                        //"HTTP/1.0"
-                        if (commands[2].Contains("HTTP/1.0"))
+                        name = commands[0];
+                        location = commands[1];
+                        for (int i = 2; i < commands.Length; i++)
                         {
-                            ched = false;
-                            name = commands[1].Remove(0, 1);
-                            string[] array = line.Split("\r\n");
-                            location = array[array.Length - 1];
-
-                            UpdateAndAdd(name, location, personLocation);
-                            response = "HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n\r\n";
-                            log += $" \" POST /{name} HTTP/1.0\" OK";
+                            location += " " + commands[i];
                         }
-                        //"HTTP/1.1"
-                        else if (commands[2].Contains("HTTP/1.1"))
-                        {
-                            ched = false;
-                            int locationIndex = line.IndexOf("&location=");
-                            int nameIndex = line.IndexOf("name=");
-                            name = line.Remove(locationIndex);
-                            name = name.Remove(0, (5 + nameIndex));
-
-                            location = line.Remove(0, (10 + locationIndex));
-                            UpdateAndAdd(name, location, personLocation);
-                            response = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\n";
-                            log += $" \" POST /name={name}&location={location}  HTTP/1.1\" OK";
-                        }
+                        location = location.Remove(location.Length - 2);
+                        UpdateAndAdd(name, location, personLocation);
+                        response = "OK";
+                        log += $"\"{name} {location} WHOIS\" OK";
                     }
-                }
 
-                if (commands.Length == 1)
-                {
-                    name = commands[0];
-                    name = name.Remove(name.Length - 2);
-                    location = GetLocation(name, personLocation);
-                    if (location != null)
+                    Console.WriteLine(log);
+                    if (LogFilePath != null)
                     {
-                        response = location;
-                        log += $" \" GET {name}\" OK";
+                        WriteLog(log, LogFilePath);
                     }
-                    else
+
+
+                    if (debug) { Console.WriteLine($"Server sending back:\"{response}\""); };
+
+
+                    lock (locker)
                     {
-                        response = "ERROR: no entries found";
-                        log += $" \" GET {name}\" UNKNOWN";
+                        StreamWriter sw = new StreamWriter(socketStream);
+                        sw.WriteLine(response);
+                        sw.Flush();
+                        if (dblocation != null) { SaveDictionary(personLocation, dblocation); }
                     }
+
                 }
-                else if (commands.Length > 1 && ched)
+                catch (Exception e)
                 {
-                    name = commands[0];
-                    location = commands[1];
-                    for (int i = 2; i < commands.Length; i++)
-                    {
-                        location += " " + commands[i];
-                    }
-                    location = location.Remove(location.Length - 2);
-                    UpdateAndAdd(name, location, personLocation);
-                    response = "OK";
-                    log += $"\"{name} {location} WHOIS\" OK";
+                    Console.WriteLine("Connection faild");
+                    Console.WriteLine(e);
                 }
-
-                Console.WriteLine(log);
-                if (logPath != null)
+                finally
                 {
-                    WriteLog(log, logPath);
+                    socketStream.Close();
+                    connection.Close();
+                    Console.WriteLine("[Disconnected]");
                 }
+            }
 
+            static void UpdateAndAdd(string name, string location, Dictionary<string, string> personLocation)
+            {
+                location = location.Trim(new Char[] { '\"', '\'', '`', '\\', '.' });
+                if (personLocation.ContainsKey(name))
+                {
+                    personLocation[name] = location;
+                }
+                else
+                {
+                    personLocation.Add(name, location);
+                }
+            }
 
-                if (debug) { Console.WriteLine($"Server sending back:\"{response}\""); };
+            static string GetLocation(string name, Dictionary<string, string> personLocation)
+            {
 
+                if (personLocation.ContainsKey(name))
+                {
+                    string location = personLocation[name];
+                    return location;
+                }
+                else
+                {
+                    return null;
+                }
+            }
 
+            static void SaveDictionary(Dictionary<string, string> database, string path)
+            {
                 lock (locker)
                 {
-                    StreamWriter sw = new StreamWriter(tcpClient.GetStream());
-                    sw.WriteLine(response);
-                    sw.Flush();
-                    if (savePath != null) { SaveDictionary(personLocation, savePath); }
-                }
-
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine("Connection faild");
-                Console.WriteLine(e);
-            }
-            finally
-            {
-                //socketStream.Close();
-                connection.Close();
-                Console.WriteLine("[Disconnected]");
-            }
-        }
-
-        private void bgWorker2_DoWork(object sender, DoWorkEventArgs e)
-        {
-            while (true)
-            {
-                this.listener.AcceptSocketAsync();
-                this.tcpClient = listener.AcceptTcpClient();
-                try
-                {
-                    int timeOut = 1000;
-                    tcpClient.ReceiveTimeout = timeOut;
-                    tcpClient.SendTimeout = timeOut;
-                    doRequest();
-                }
-                catch
-                {
-                    Console.WriteLine("Unexpected error");
-                }
-            }
-        }
-
-        static void UpdateAndAdd(string name, string location, Dictionary<string, string> personLocation)
-        {
-            location = location.Trim(new Char[] { '\"', '\'', '`', '\\', '.' });
-            if (personLocation.ContainsKey(name))
-            {
-                personLocation[name] = location;
-            }
-            else
-            {
-                personLocation.Add(name, location);
-            }
-        }
-
-        static string GetLocation(string name, Dictionary<string, string> personLocation)
-        {
-
-            if (personLocation.ContainsKey(name))
-            {
-                string location = personLocation[name];
-                return location;
-            }
-            else
-            {
-                return null;
-            }
-        }
-
-        static void SaveDictionary(Dictionary<string, string> database, string path)
-        {
-            lock (locker)
-            {
-                try
-                {
-                    StreamWriter sw = new StreamWriter(path);
-                    foreach (var entry in database)
+                    try
                     {
-                        sw.WriteLine("{0} {1}", entry.Key, entry.Value);
+                        StreamWriter sw = new StreamWriter(path);
+                        foreach (var entry in database)
+                        {
+                            sw.WriteLine("{0} {1}", entry.Key, entry.Value);
+                        }
+                        sw.Close();
                     }
-                    sw.Close();
-                }
-                catch
-                {
-                    Console.WriteLine("Unable to save the database");
+                    catch
+                    {
+                        Console.WriteLine("Unable to save the database");
+                    }
                 }
             }
-        }
 
-        static void WriteLog(string logMessage, string FilePath)
-        {
-            lock (locker)
+            static void WriteLog(string logMessage, string FilePath)
             {
-                try
+                lock (locker)
                 {
-                    StreamWriter sw;
-                    sw = File.AppendText(FilePath);
-                    sw.WriteLine(logMessage);
-                    sw.Close();
-                }
-                catch
-                {
-                    Console.WriteLine("Unable to write the Log message");
+                    try
+                    {
+                        StreamWriter sw;
+                        sw = File.AppendText(FilePath);
+                        sw.WriteLine(logMessage);
+                        sw.Close();
+                    }
+                    catch
+                    {
+                        Console.WriteLine("Unable to write the Log message");
+                    }
                 }
             }
         }
-    }
 
+    }
 }
