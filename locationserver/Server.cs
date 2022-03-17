@@ -16,7 +16,7 @@ namespace locationserver
         protected Handler RequestHandler;
         public Dictionary<string, string> personLocation = new Dictionary<string, string>();
 
-        private string logPath, dbPath;
+        protected string logPath, dbPath;
         private bool debug = false;
 
         public void Main(string[] args)
@@ -77,7 +77,7 @@ namespace locationserver
                 connection = listener.AcceptSocket();
                 RequestHandler = new Handler();
                 string lg;
-                new Thread(() => RequestHandler.doRequest(connection, out lg, personLocation)).Start();
+                new Thread(() => RequestHandler.doRequest(connection, out lg, personLocation,logPath,dbPath)).Start();
             }
             catch (Exception)
             {
@@ -104,9 +104,10 @@ namespace locationserver
         }
         public class Handler: Server
         {
+            
             private static readonly object locker = new object();
             public NetworkStream socketStream;
-            public void doRequest(Socket connection, out string lg,Dictionary<string,string> personLocation)
+            public void doRequest(Socket connection, out string lg,Dictionary<string,string> personLocation,string logPath,string dbPath)
             {
                 lg = null;
                 socketStream = new NetworkStream(connection);

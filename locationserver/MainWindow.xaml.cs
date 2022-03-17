@@ -27,8 +27,9 @@ namespace locationserver
         private List<string> arguments = new List<string>();
         private BackgroundWorker worker = new BackgroundWorker();
         private Server myserver = new Server();
-        
-        public string outter = null;
+        private string LogPath = null;
+        private string DBPath = null;
+
 
         public MainWindow()
         {
@@ -64,8 +65,10 @@ namespace locationserver
             {
                 myserver.connection = myserver.listener.AcceptSocket();
                 Server.Handler RequestHandler = new Server.Handler();
-                RequestHandler.doRequest(myserver.connection, out lg, myserver.personLocation);
-                this.Dispatcher.Invoke(() => {consol.Text = "New Connection\r\n";});
+                //RequestHandler.logPath = myserver.logPath;
+                //RequestHandler.dbPath = myserver.dbPath;
+                RequestHandler.doRequest(myserver.connection, out lg, myserver.personLocation,LogPath,DBPath);
+                this.Dispatcher.Invoke(() => {consol.Text += "New Connection\r\n";});
                 this.Dispatcher.Invoke(() => {consol.Text += lg + "\r\n";});
                 this.Dispatcher.Invoke(() => {consol.Text += $"[Disconnected]\r\n"; });
             }
@@ -90,15 +93,12 @@ namespace locationserver
                 saveFileDialog.ShowDialog();
                 string path = saveFileDialog.ToString();
                 path = path.Remove(0, 51);
-
-                arguments.Add("-l");
-                arguments.Add(path);
+                LogPath = path;
             }
             else
             {
                 saveLog.IsChecked = false;
-                arguments.RemoveAt(1 + arguments.IndexOf("-l"));
-                arguments.RemoveAt(arguments.IndexOf("-l"));
+                LogPath = null;
             }
         }
 
@@ -111,15 +111,16 @@ namespace locationserver
                 saveFileDialog.ShowDialog();
                 string path = saveFileDialog.ToString();
                 path = path.Remove(0, 51);
-
-                arguments.Add("-f");
-                arguments.Add(path);
+                DBPath = path;
+                //arguments.Add("-f");
+                //arguments.Add(path);
             }
             else
             {
                 saveLog.IsChecked = false;
-                arguments.RemoveAt(1 + arguments.IndexOf("-f"));
-                arguments.RemoveAt(arguments.IndexOf("-f"));
+                DBPath = null;
+                //arguments.RemoveAt(1 + arguments.IndexOf("-f"));
+                //arguments.RemoveAt(arguments.IndexOf("-f"));
             }
         }
     }

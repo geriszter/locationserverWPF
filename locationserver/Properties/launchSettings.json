@@ -1,7 +1,8 @@
 {
   "profiles": {
     "locationserver": {
-      "commandName": "Project"
+      "commandName": "Project",
+      "commandLineArgs": "-l \\\\adir.hull.ac.uk\\home\\606\\606497\\Downloads\\asd.txt"
     }
   }
 }
