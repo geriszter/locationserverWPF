@@ -1,8 +1,7 @@
 {
   "profiles": {
     "locationserver": {
-      "commandName": "Project",
-      "commandLineArgs": "-w"
+      "commandName": "Project"
     }
   }
 }

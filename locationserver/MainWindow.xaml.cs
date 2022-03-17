@@ -64,7 +64,7 @@ namespace locationserver
             {
                 myserver.connection = myserver.listener.AcceptSocket();
                 Server.Handler RequestHandler = new Server.Handler();
-                RequestHandler.doRequest(myserver.connection, out lg);
+                RequestHandler.doRequest(myserver.connection, out lg, myserver.personLocation);
                 this.Dispatcher.Invoke(() => {consol.Text = "New Connection\r\n";});
                 this.Dispatcher.Invoke(() => {consol.Text += lg + "\r\n";});
                 this.Dispatcher.Invoke(() => {consol.Text += $"[Disconnected]\r\n"; });

@@ -72,10 +72,17 @@ namespace locationserver
 
         public void serverLoop()
         {
-            connection = listener.AcceptSocket();
-            RequestHandler = new Handler();
-            string lg;
-            new Thread(() => RequestHandler.doRequest(connection, out lg)).Start();
+            try
+            {
+                connection = listener.AcceptSocket();
+                RequestHandler = new Handler();
+                string lg;
+                new Thread(() => RequestHandler.doRequest(connection, out lg, personLocation)).Start();
+            }
+            catch (Exception)
+            {
+                throw;
+            }
         }
 
 
@@ -99,7 +106,7 @@ namespace locationserver
         {
             private static readonly object locker = new object();
             public NetworkStream socketStream;
-            public void doRequest(Socket connection, out string lg)
+            public void doRequest(Socket connection, out string lg,Dictionary<string,string> personLocation)
             {
                 lg = null;
                 socketStream = new NetworkStream(connection);
@@ -132,7 +139,7 @@ namespace locationserver
                     string log = null;
                     if (!UIMode)
                     {
-                        RequestFormat(personLocation, ip, line, out response, out log);
+                        RequestFormat(ip, line, out response, out log, personLocation);
                     }
 
                     Console.WriteLine(log);
@@ -172,7 +179,7 @@ namespace locationserver
             /// <param name="line">The input what we want to process</param>
             /// <param name="response">The response what we sending back</param>
             /// <param name="log">The log message of the input</param>
-            public void RequestFormat(Dictionary<string, string> personLocation, string ip, string line, out string response, out string log)
+            public void RequestFormat(string ip, string line, out string response, out string log,Dictionary<string,string> personLocation)
             {
                 string name = null;
                 string location = null;
